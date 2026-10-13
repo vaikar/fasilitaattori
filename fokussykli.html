@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#0b0b0c">
+<title>Fokussykli</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@200;300;500&family=Figtree:wght@400;500;600&display=swap">
+<style>
+/* Layout: one screen; timer ring left, goal/output journal right; stacks in portrait */
+:root{
+  --bg:#0b0b0c; --surface:#141416; --line:#26262a; --fg:#ecebe6; --muted:#8a8984;
+  --accent:#e6b25a; --rest:#7fb3a6;
+  --mono:"Azeret Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --sans:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:16px;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box}
+.app{min-height:100%;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:clamp(24px,4vw,56px);padding-inline:clamp(16px,4vw,48px);padding-block:clamp(16px,3vw,36px);max-width:1280px;margin:0 auto}
+@media (max-width:860px),(orientation:portrait) and (max-width:1100px){.app{grid-template-columns:minmax(0,1fr)}}
+
+header{grid-column:1/-1;display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.brand{font-weight:600;letter-spacing:.14em;text-transform:uppercase;font-size:.78rem;color:var(--muted)}
+.today{font-family:var(--mono);font-size:.82rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.today b{color:var(--fg);font-weight:500}
+
+/* timer */
+.timer{display:flex;flex-direction:column;align-items:center;gap:22px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:4px;gap:4px}
+.seg button{border:0;background:transparent;color:var(--muted);font:500 .9rem var(--sans);padding:9px 20px;border-radius:999px;cursor:pointer;min-height:40px}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line)}
+.ring{position:relative;width:min(100%,440px);aspect-ratio:1;max-width:100%}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:3}
+.ring .track{stroke:var(--line)}
+.ring .prog{stroke:var(--accent);stroke-linecap:round;transition:stroke-dashoffset .4s linear,stroke .3s}
+.rest .ring .prog{stroke:var(--rest)}
+.ticks line{stroke:var(--line);stroke-width:1.5}
+.face{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+.digits{font-family:var(--mono);font-weight:200;font-size:clamp(3.6rem,11vw,6.6rem);letter-spacing:-.04em;font-variant-numeric:tabular-nums;line-height:1}
+.state{font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);min-height:1.2em;text-align:center;padding-inline:20%}
+.state.done{color:var(--accent)}
+.adj{display:flex;align-items:center;gap:10px}
+.adj button{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--fg);font:300 1.4rem var(--mono);cursor:pointer}
+.adj button:disabled{opacity:.25;cursor:default}
+.setmin{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;align-items:center}
+.chip{border:1px solid var(--line);background:transparent;color:var(--muted);font:500 .88rem var(--mono);padding:10px 16px;border-radius:10px;cursor:pointer;min-height:44px;font-variant-numeric:tabular-nums}
+.chip[aria-pressed="true"]{color:var(--fg);border-color:var(--muted)}
+.custom{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:10px;padding:0 12px;min-height:44px;color:var(--muted);font:.88rem var(--mono)}
+.custom input{width:3.2em;background:transparent;border:0;color:var(--fg);font:500 .95rem var(--mono);text-align:right;padding:10px 0}
+.custom input:focus{outline:none}
+.custom:focus-within{border-color:var(--accent)}
+.controls{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.btn{min-height:54px;padding:0 30px;border-radius:14px;font:600 1rem var(--sans);cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--fg)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#141008;min-width:170px}
+.rest .btn.primary{background:var(--rest);border-color:var(--rest)}
+.btn:disabled{opacity:.35;cursor:default}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+/* journal */
+.journal{display:flex;flex-direction:column;gap:20px;min-width:0}
+.field{display:flex;flex-direction:column;gap:8px}
+.field label{display:flex;justify-content:space-between;align-items:baseline;font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.field label span{letter-spacing:0;text-transform:none;font-size:.8rem;opacity:.8}
+textarea{width:100%;resize:vertical;min-height:96px;background:var(--surface);border:1px solid var(--line);border-radius:14px;color:var(--fg);font:1.05rem/1.5 var(--sans);padding:14px 16px}
+textarea::placeholder{color:#55554f}
+textarea:focus{outline:none;border-color:var(--accent)}
+.field.call textarea{border-color:var(--accent);box-shadow:0 0 0 4px rgba(230,178,90,.12)}
+.save{align-self:flex-start}
+.log{border-top:1px solid var(--line);padding-top:18px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.log h2{font-size:.75rem;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 6px;display:flex;justify-content:space-between}
+.log h2 button{background:none;border:0;color:var(--muted);font:.78rem var(--sans);cursor:pointer;text-transform:none;letter-spacing:0;padding:4px}
+.log ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;max-height:42vh;overflow:auto}
+.log li{display:grid;grid-template-columns:4.6em minmax(0,1fr);gap:4px 14px;padding:12px 0;border-bottom:1px solid var(--line)}
+.log li:last-child{border-bottom:0}
+.when{font-family:var(--mono);font-size:.8rem;color:var(--muted);font-variant-numeric:tabular-nums;line-height:1.5}
+.when b{display:block;color:var(--fg);font-weight:500}
+.g{font-weight:500;overflow-wrap:anywhere}
+.o{grid-column:2;color:var(--muted);font-size:.93rem;overflow-wrap:anywhere}
+.o::before{content:"→ ";color:var(--accent)}
+.empty{color:var(--muted);font-size:.93rem;line-height:1.5;margin:0}
+.confirm{display:flex;gap:8px;align-items:center;font-size:.85rem;color:var(--muted)}
+.confirm button{background:none;border:1px solid var(--line);color:var(--fg);border-radius:8px;padding:6px 10px;cursor:pointer;font:.8rem var(--sans)}
+@media (prefers-reduced-motion:reduce){.ring .prog{transition:none}}
+</style>
+<style>body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <header>
+    <div class="brand">Fokussykli</div>
+    <div class="today" id="today">Tänään <b>0</b> sykliä · <b>0</b> min</div>
+  </header>
+
+  <section class="timer" aria-label="Ajastin">
+    <div class="seg" role="group" aria-label="Tila">
+      <button id="modeWork" aria-pressed="true">Työ</button>
+      <button id="modeRest" aria-pressed="false">Tauko</button>
+    </div>
+
+    <div class="ring">
+      <svg viewBox="0 0 200 200" aria-hidden="true">
+        <g class="ticks" id="ticks"></g>
+        <circle class="track" cx="100" cy="100" r="88"></circle>
+        <circle class="prog" id="prog" cx="100" cy="100" r="88"></circle>
+      </svg>
+      <div class="face">
+        <div class="adj">
+          <button id="minus" aria-label="Vähennä minuutti">−</button>
+          <div class="digits" id="digits" role="timer" aria-live="off">25:00</div>
+          <button id="plus" aria-label="Lisää minuutti">+</button>
+        </div>
+        <div class="state" id="state">Valmis aloittamaan</div>
+      </div>
+    </div>
+
+    <div class="setmin" id="presets">
+      <button class="chip" data-m="15">15</button>
+      <button class="chip" data-m="25" aria-pressed="true">25</button>
+      <button class="chip" data-m="45">45</button>
+      <button class="chip" data-m="60">60</button>
+      <label class="custom" for="customMin"><input id="customMin" type="number" inputmode="numeric" min="1" max="180" placeholder="oma"> min</label>
+    </div>
+
+    <div class="controls">
+      <button class="btn primary" id="startBtn">Aloita</button>
+      <button class="btn" id="resetBtn">Nollaa</button>
+    </div>
+  </section>
+
+  <section class="journal" aria-label="Sykli">
+    <div class="field" id="goalField">
+      <label for="goal">Tavoite <span>mitä tämä sykli saa aikaan</span></label>
+      <textarea id="goal" placeholder="Esim. Luonnostele raportin johdanto"></textarea>
+    </div>
+    <div class="field" id="outField">
+      <label for="output">Tuotos <span>mitä oikeasti syntyi</span></label>
+      <textarea id="output" placeholder="Kirjaa syklin päätteeksi"></textarea>
+    </div>
+    <button class="btn save" id="saveBtn">Tallenna sykli</button>
+
+    <div class="log">
+      <h2>Syklit <span id="clearWrap"><button id="clearBtn">Tyhjennä</button></span></h2>
+      <ol id="logList"></ol>
+      <p class="empty" id="empty">Tallennetut syklit näkyvät tässä: aika, kesto, tavoite ja tuotos. Aseta aika, kirjoita tavoite ja paina Aloita.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+(()=>{
+const $=id=>document.getElementById(id);
+const R=88,C=2*Math.PI*R;
+const prog=$('prog');prog.style.strokeDasharray=C;
+// 60 minute ticks
+const tk=$('ticks');for(let i=0;i<60;i++){const a=i/60*2*Math.PI,r1=i%5?96:94,r2=99;const l=document.createElementNS('http://www.w3.org/2000/svg','line');l.setAttribute('x1',100+r1*Math.cos(a));l.setAttribute('y1',100+r1*Math.sin(a));l.setAttribute('x2',100+r2*Math.cos(a));l.setAttribute('y2',100+r2*Math.sin(a));tk.appendChild(l)}
+
+const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+let s=store.get('fs_state',{mode:'work',work:25,rest:5});
+let log=store.get('fs_log',[]);
+let running=false,endAt=0,remaining=0,startedAt=null,raf=null,wake=null,finished=false;
+$('goal').value=store.get('fs_goal','');$('output').value=store.get('fs_out','');
+
+const total=()=>(s.mode==='work'?s.work:s.rest)*60000;
+remaining=total();
+
+function fmt(ms){const t=Math.max(0,Math.ceil(ms/1000));const m=Math.floor(t/60),x=t%60;return String(m).padStart(2,'0')+':'+String(x).padStart(2,'0')}
+function render(){
+  $('digits').textContent=fmt(remaining);
+  const f=Math.min(1,Math.max(0,1-remaining/total()));
+  prog.style.strokeDashoffset=C*(1-f);
+  $('app').classList.toggle('rest',s.mode==='rest');
+  $('modeWork').setAttribute('aria-pressed',s.mode==='work');$('modeRest').setAttribute('aria-pressed',s.mode==='rest');
+  const cur=s.mode==='work'?s.work:s.rest;
+  document.querySelectorAll('.chip').forEach(c=>c.setAttribute('aria-pressed',+c.dataset.m===cur));
+  const idle=!running&&remaining===total();
+  ['minus','plus'].forEach(id=>$(id).disabled=!idle);
+  document.querySelectorAll('.chip,#customMin').forEach(e=>e.disabled=running);
+  $('startBtn').textContent=running?'Pysäytä':(remaining<total()&&remaining>0?'Jatka':(finished?'Uusi sykli':'Aloita'));
+  document.title=running?fmt(remaining)+' · '+(s.mode==='work'?'Työ':'Tauko'):'Fokussykli';
+}
+function setState(t,done){const el=$('state');el.textContent=t;el.classList.toggle('done',!!done)}
+function setMinutes(m){m=Math.max(1,Math.min(180,Math.round(m)||1));if(s.mode==='work')s.work=m;else s.rest=m;store.set('fs_state',s);remaining=total();finished=false;setState('Valmis aloittamaan');render()}
+
+function tick(){remaining=endAt-Date.now();if(remaining<=0){remaining=0;complete();return}render();raf=setTimeout(tick,250)}
+async function lockOn(){try{if('wakeLock'in navigator)wake=await navigator.wakeLock.request('screen')}catch(e){}}
+function lockOff(){try{wake&&wake.release()}catch(e){}wake=null}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&running){lockOn();clearTimeout(raf);tick()}});
+
+let ac=null;
+function chime(){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();const now=ac.currentTime;[0,.35,.7].forEach((d,i)=>{const o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.value=[660,880,990][i];g.gain.setValueAtTime(0,now+d);g.gain.linearRampToValueAtTime(.25,now+d+.02);g.gain.exponentialRampToValueAtTime(.001,now+d+1.1);o.connect(g).connect(ac.destination);o.start(now+d);o.stop(now+d+1.2)})}catch(e){}}
+
+function start(){
+  if(finished){reset();}
+  if(remaining<=0)remaining=total();
+  if(!startedAt)startedAt=Date.now();
+  try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();ac.resume()}catch(e){}
+  endAt=Date.now()+remaining;running=true;lockOn();
+  setState(s.mode==='work'?($('goal').value.trim()?'Keskity':'Keskity · lisää tavoite'):'Tauko käynnissä');
+  tick();
+}
+function pause(){running=false;clearTimeout(raf);remaining=Math.max(0,endAt-Date.now());lockOff();setState('Pysäytetty');render()}
+function reset(){running=false;clearTimeout(raf);remaining=total();startedAt=null;finished=false;lockOff();$('outField').classList.remove('call');setState('Valmis aloittamaan');render()}
+function complete(){
+  running=false;clearTimeout(raf);lockOff();finished=true;chime();render();
+  if(s.mode==='work'){setState('Sykli valmis · kirjaa tuotos',true);$('outField').classList.add('call');$('output').focus({preventScroll:true})}
+  else{setState('Tauko ohi',true)}
+}
+
+$('startBtn').onclick=()=>running?pause():start();
+$('resetBtn').onclick=reset;
+$('minus').onclick=()=>setMinutes((s.mode==='work'?s.work:s.rest)-1);
+$('plus').onclick=()=>setMinutes((s.mode==='work'?s.work:s.rest)+1);
+document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{$('customMin').value='';setMinutes(+c.dataset.m)});
+$('customMin').addEventListener('change',e=>{if(e.target.value)setMinutes(+e.target.value)});
+$('customMin').addEventListener('keydown',e=>{if(e.key==='Enter'){e.target.blur()}});
+function setMode(m){if(running)return;s.mode=m;store.set('fs_state',s);reset()}
+$('modeWork').onclick=()=>setMode('work');$('modeRest').onclick=()=>setMode('rest');
+$('goal').addEventListener('input',e=>store.set('fs_goal',e.target.value));
+$('output').addEventListener('input',e=>{store.set('fs_out',e.target.value);if(e.target.value.trim())$('outField').classList.remove('call')});
+
+$('saveBtn').onclick=()=>{
+  const goal=$('goal').value.trim(),out=$('output').value.trim();
+  if(!goal&&!out){setState('Kirjoita tavoite tai tuotos ennen tallennusta');return}
+  let mins;
+  if(s.mode==='work'&&(startedAt||finished)){const used=total()-(running?Math.max(0,endAt-Date.now()):remaining);mins=Math.max(1,Math.round(used/60000))}else mins=s.work;
+  log.unshift({t:startedAt||Date.now(),m:mins,g:goal,o:out});store.set('fs_log',log);
+  $('goal').value='';$('output').value='';store.set('fs_goal','');store.set('fs_out','');
+  if(s.mode==='work'){reset()}
+  renderLog();setState('Sykli tallennettu',true);
+};
+
+function renderLog(){
+  const ol=$('logList');ol.innerHTML='';
+  log.forEach(e=>{const d=new Date(e.t);const li=document.createElement('li');
+    const w=document.createElement('div');w.className='when';w.innerHTML='<b>'+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+'</b>'+e.m+' min';
+    const g=document.createElement('div');g.className='g';g.textContent=e.g||'(ei tavoitetta)';
+    li.append(w,g);if(e.o){const o=document.createElement('div');o.className='o';o.textContent=e.o;li.append(o)}
+    if(new Date().toDateString()!==d.toDateString()){w.querySelector('b').textContent=d.getDate()+'.'+(d.getMonth()+1)+'.'}
+    ol.append(li)});
+  $('empty').hidden=log.length>0;$('clearWrap').hidden=log.length===0;
+  const td=log.filter(e=>new Date(e.t).toDateString()===new Date().toDateString());
+  $('today').innerHTML='Tänään <b>'+td.length+'</b> sykliä · <b>'+td.reduce((a,e)=>a+e.m,0)+'</b> min';
+}
+function restoreClear(){$('clearWrap').innerHTML='<button id="clearBtn">Tyhjennä</button>';bindClear()}
+function bindClear(){$('clearBtn').onclick=()=>{const w=$('clearWrap');w.innerHTML='<span class="confirm">Poistetaanko kaikki? <button id="cy">Poista</button><button id="cn">Peru</button></span>';$('cy').onclick=()=>{log=[];store.set('fs_log',log);restoreClear();renderLog()};$('cn').onclick=()=>{restoreClear();renderLog()}}}
+bindClear();
+
+render();renderLog();
+})();
+</script>
+</body>
+</html>
